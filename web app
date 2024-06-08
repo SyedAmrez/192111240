@@ -1,0 +1,260 @@
+import axios from 'axios';
+
+const API_URL = 'http://localhost:5000/api'; // Adjust URL as needed
+
+export const register = async () => {
+  try {
+    const response = await axios.post(`${API_URL}/register`);
+    return response.data;
+  } catch (error) {
+    console.error('Registration failed:', error);
+  }
+};
+
+export const fetchProducts = async (category, company) => {
+  try {
+    const response = await axios.get(`${API_URL}/products`, {
+      params: { category, company },
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Fetching products failed:', error);
+  }
+};
+
+export const fetchProductDetails = async (productId) => {
+  try {
+    const response = await axios.get(`${API_URL}/product/${productId}`);
+    return response.data;
+  } catch (error) {
+    console.error('Fetching product details failed:', error);
+  }
+};
+
+import React, { useEffect, useState } from 'react';
+import { fetchProducts } from '../api';
+import ProductCard from './ProductCard';
+import './ProductList.css';
+
+const ProductList = () => {
+  const [products, setProducts] = useState([]);
+  const [filters, setFilters] = useState({
+    category: '',
+    company: '',
+    rating: 0,
+    priceRange: [0, 1000],
+    availability: true,
+  });
+  const [sortOrder, setSortOrder] = useState('price');
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+
+  useEffect(() => {
+    const getProducts = async () => {
+      const data = await fetchProducts(filters.category, filters.company);
+      setProducts(data);
+    };
+    getProducts();
+  }, [filters]);
+
+  const handleFilterChange = (e) => {
+    setFilters({ ...filters, [e.target.name]: e.target.value });
+  };
+
+  const handleSortChange = (e) => {
+    setSortOrder(e.target.value);
+  };
+
+  const handlePageChange = (pageNumber) => {
+    setCurrentPage(pageNumber);
+  };
+
+  const sortedProducts = [...products].sort((a, b) => {
+    if (sortOrder === 'price') {
+      return a.price - b.price;
+    } else if (sortOrder === 'rating') {
+      return b.rating - a.rating;
+    } else if (sortOrder === 'discount') {
+      return b.discount - a.discount;
+    }
+    return 0;
+  });
+
+  const paginatedProducts = sortedProducts.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+
+  return (
+    <div>
+      <h1>Product List</h1>
+      <div className="filters">
+        <select name="category" onChange={handleFilterChange}>
+          <option value="">All Categories</option>
+          {/* Add category options here */}
+        </select>
+        <select name="company" onChange={handleFilterChange}>
+          <option value="">All Companies</option>
+          {/* Add company options here */}
+        </select>
+        <input
+          type="number"
+          name="rating"
+          min="0"
+          max="5"
+          onChange={handleFilterChange}
+          placeholder="Rating"
+        />
+        <input
+          type="range"
+          name="priceRange"
+          min="0"
+          max="1000"
+          onChange={handleFilterChange}
+          placeholder="Price Range"
+        />
+        <input
+          type="checkbox"
+          name="availability"
+          onChange={(e) => setFilters({ ...filters, availability: e.target.checked })}
+        />
+        <label>Available</label>
+        <select name="sortOrder" onChange={handleSortChange}>
+          <option value="price">Sort by Price</option>
+          <option value="rating">Sort by Rating</option>
+          <option value="discount">Sort by Discount</option>
+        </select>
+      </div>
+      <div className="product-list">
+        {paginatedProducts.map((product) => (
+          <ProductCard key={product.id} product={product} />
+        ))}
+      </div>
+      <div className="pagination">
+        {/* Add pagination controls here */}
+      </div>
+    </div>
+  );
+};
+
+export default ProductList;
+import React from 'react';
+import { Link } from 'react-router-dom';
+import './ProductCard.css';
+
+const ProductCard = ({ product }) => {
+  return (
+    <div className="product-card">
+      <img src={product.imageUrl} alt={product.name} />
+      <h2>{product.name}</h2>
+      <p>{product.company}</p>
+      <p>{product.category}</p>
+      <p>${product.price}</p>
+      <p>Rating: {product.rating}</p>
+      <p>Discount: {product.discount}%</p>
+      <p>{product.availability ? 'In Stock' : 'Out of Stock'}</p>
+      <Link to={`/product/${product.id}`}>View Details</Link>
+    </div>
+  );
+};
+
+export default ProductCard;
+import React, { useEffect, useState } from 'react';
+import { useParams } from 'react-router-dom';
+import { fetchProductDetails } from '../api';
+import './ProductDetails.css';
+
+const ProductDetails = () => {
+  const { productId } = useParams();
+  const [product, setProduct] = useState(null);
+
+  useEffect(() => {
+    const getProductDetails = async () => {
+      const data = await fetchProductDetails(productId);
+      setProduct(data);
+    };
+    getProductDetails();
+  }, [productId]);
+
+  if (!product) {
+    return <div>Loading...</div>;
+  }
+
+  return (
+    <div className="product-details">
+      <img src={product.imageUrl} alt={product.name} />
+      <h1>{product.name}</h1>
+      <p>{product.company}</p>
+      <p>{product.category}</p>
+      <p>${product.price}</p>
+      <p>Rating: {product.rating}</p>
+      <p>Discount: {product.discount}%</p>
+      <p>{product.availability ? 'In Stock' : 'Out of Stock'}</p>
+    </div>
+  );
+};
+
+export default ProductDetails;
+
+import React from 'react';
+import { BrowserRouter as Router, Route, Switch } from 'react-router-dom';
+import ProductList from './components/ProductList';
+import ProductDetails from './components/ProductDetails';
+import './App.css';
+
+function App() {
+  return (
+    <Router>
+      <div className="App">
+        <Switch>
+          <Route path="/" exact component={ProductList} />
+          <Route path="/product/:productId" component={ProductDetails} />
+        </Switch>
+      </div>
+    </Router>
+  );
+}
+
+export default App;
+.filters {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 20px;
+}
+
+.product-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+}
+
+.pagination {
+  margin-top: 20px;
+  display: flex;
+  justify-content: center;
+}
+
+.product-card {
+  border: 1px solid #ccc;
+  padding: 20px;
+  border-radius: 8px;
+  width: 200px;
+  text-align: center;
+}
+
+.product-card img {
+  width: 100%;
+  height: auto;
+  border-radius: 8px;
+}
+.product-details {
+  padding: 20px;
+  text-align: center;
+}
+
+.product-details img {
+  width: 300px;
+  height: auto;
+  border-radius: 8px;
+  margin-bottom: 20px;
+}
