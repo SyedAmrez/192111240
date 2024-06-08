@@ -1,0 +1,125 @@
+const express = require('express');
+const axios = require('axios');
+
+const app = express();
+const port = 3000;
+const WINDOW_SIZE = 10;
+const TIMEOUT = 500;
+
+let numberStorage = [];
+
+const fetchNumber = async (type) => {
+  try {
+    const response = await axios.get(`https://third-party-api.com/numbers/${type}`, { timeout: TIMEOUT });
+    return response.data.number;
+  } catch (error) {
+    console.error('Error fetching number:', error.message);
+    return null;
+  }
+};
+
+const isUnique = (number) => {
+  return !numberStorage.includes(number);
+};
+
+const calculateAverage = () => {
+  if (numberStorage.length === 0) return 0;
+  const sum = numberStorage.reduce((a, b) => a + b, 0);
+  return (sum / numberStorage.length).toFixed(2);
+};
+
+app.get('/numbers/:type', async (req, res) => {
+  const { type } = req.params;
+
+  if (!['p', 'f', 'e', 'r'].includes(type)) {
+    return res.status(400).json({ error: 'Invalid number type' });
+  }
+
+  const windowPrevState = [...numberStorage];
+  const number = await fetchNumber(type);
+
+  if (number !== null && isUnique(number)) {
+    if (numberStorage.length >= WINDOW_SIZE) {
+      numberStorage.shift();
+    }
+    numberStorage.push(number);
+  }
+
+  const windowCurrState = [...numberStorage];
+  const average = calculateAverage();
+
+  res.json({
+    windowPrevState,
+    windowCurrState,
+    numbers: number !== null ? [number] : [],
+    avg: average
+  });
+});
+
+app.listen(port, () => {
+  console.log(`Server running on http://localhost:${port}`);
+});
+
+
+// src/NumberFetcher.js
+import React, { useState } from 'react';
+import axios from 'axios';
+
+const NumberFetcher = () => {
+  const [numberType, setNumberType] = useState('');
+  const [result, setResult] = useState(null);
+
+  const fetchNumbers = async (type) => {
+    try {
+      const response = await axios.get(`http://localhost:3000/numbers/${type}`);
+      setResult(response.data);
+    } catch (error) {
+      console.error('Error fetching numbers:', error);
+    }
+  };
+
+  return (
+    <div>
+      <h1>Average Calculator</h1>
+      <select onChange={(e) => setNumberType(e.target.value)} value={numberType}>
+        <option value="">Select number type</option>
+        <option value="p">Prime</option>
+        <option value="f">Fibonacci</option>
+        <option value="e">Even</option>
+        <option value="r">Random</option>
+      </select>
+      <button onClick={() => fetchNumbers(numberType)}>Fetch Number</button>
+      {result && (
+        <div>
+          <h2>Results</h2>
+          <p><strong>Previous State:</strong> {JSON.stringify(result.windowPrevState)}</p>
+          <p><strong>Current State:</strong> {JSON.stringify(result.windowCurrState)}</p>
+          <p><strong>Fetched Numbers:</strong> {JSON.stringify(result.numbers)}</p>
+          <p><strong>Average:</strong> {result.avg}</p>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default NumberFetcher;
+
+/* src/App.css */
+.App {
+  text-align: center;
+  padding: 20px;
+}
+
+select {
+  margin: 10px;
+  padding: 5px;
+}
+
+button {
+  padding: 5px 10px;
+  margin: 10px;
+}
+
+div {
+  margin: 10px 0;
+}
